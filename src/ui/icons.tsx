@@ -80,33 +80,6 @@ export const InfoIcon = () => (
   </svg>
 );
 
-export const MenuIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={1.8}>
-    <path d="M4 7h16M4 12h16M4 17h16" />
-  </svg>
-);
-
-export const CloseIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...stroke} strokeWidth={1.8}>
-    <path d="M6 6l12 12M18 6 6 18" />
-  </svg>
-);
-
-export const BuildingIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
-    <path d="M5 20V7.5L12 4l7 3.5V20" />
-    <path d="M9 20v-5h6v5" />
-    <path d="M9 10h.01M12 10h.01M15 10h.01M9 13h.01M12 13h.01M15 13h.01" />
-  </svg>
-);
-
-export const TreeNavIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
-    <path d="M12 21v-6" />
-    <path d="M7 12.5a4.2 4.2 0 0 1 .8-7.5 4.5 4.5 0 0 1 8.4-1 4 4 0 0 1 3 6.8H7.8Z" />
-  </svg>
-);
-
 export const SoundOnIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
     <path d="M4 9.5v5h3.2L12 18.6V5.4L7.2 9.5H4Z" />
@@ -177,33 +150,3 @@ export const BirchIcon = () => (
   </svg>
 );
 
-/* -------------------------------------------------------------- buildings */
-
-export const HouseIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
-    <path d="M4.5 11.5 12 5l7.5 6.5" />
-    <path d="M7 10.8V19h10v-8.2" />
-    <path d="M10.2 19v-4.2h3.6V19" />
-  </svg>
-);
-
-export const TowerIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
-    <path d="M12 2.5v3.2" />
-    <path d="M10.6 5.7h2.8" />
-    <path d="M9.4 10.2h5.2" />
-    <path d="M8.2 21 10.2 8.2h3.6L15.8 21" />
-    <path d="M6.5 21h11" />
-    <path d="m9.2 14.5 5.6-2.2M14.8 14.5 9.2 12.3" />
-  </svg>
-);
-
-export const ShrineIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
-    <path d="M6.5 20V9.5M17.5 20V9.5" />
-    <path d="M4.5 8.2h15" />
-    <path d="M5.5 10.8h13" />
-    <path d="M8 14.5h8" />
-    <path d="M9.5 20v-3.2h5V20" />
-  </svg>
-);
