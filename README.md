@@ -20,8 +20,15 @@ npm run build
 
 公開 URL: https://toku1639.github.io/grove-qr/
 
-`main` への push で Actions が `dist` をビルドして Pages にデプロイします。  
-リポジトリ設定の **Pages → Source** は **GitHub Actions** にしてください（`/docs` やブランチ直出しだと真っ白になります）。
+`main` への push で Actions が本番ビルドし、`gh-pages` ブランチへ公開します。
+
+**Pages 設定（重要）**
+
+1. Settings → Pages → **Build and deployment → Source**
+2. **Deploy from a branch** を選ぶ
+3. Branch: **`gh-pages`** / folder: **`/ (root)`** → Save
+
+※ Source を GitHub Actions のまま、または `main` 直出しにすると、ビルド前のソースが配信されて真っ白になります。
 
 ## 構成
 
