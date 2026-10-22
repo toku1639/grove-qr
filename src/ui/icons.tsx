@@ -125,15 +125,6 @@ export const OakIcon = () => (
   </svg>
 );
 
-export const PineIcon = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
-    <path d="M12 21v-3" />
-    <path d="M12 2.6 8.2 8.4h7.6L12 2.6Z" />
-    <path d="M12 7.6 6.6 14h10.8L12 7.6Z" />
-    <path d="M12 12.4 5.4 18.4h13.2L12 12.4Z" />
-  </svg>
-);
-
 export const WillowIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" {...stroke}>
     <path d="M12 21v-7" />

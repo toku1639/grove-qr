@@ -1,8 +1,8 @@
-# Phase 1 — 季節の木（magic-tree ベース）
+# Phase 1 — 季節の木（GroveQR）
 
 更新日: 2026-10-21
 
-本体は Vite + React + three.js の magic-tree です。以前の Next.js 試作と every-qrcode 同梱物は削除済み。
+本体は Vite + React + three.js の GroveQR です。以前の Next.js 試作と every-qrcode 同梱物は削除済み。
 
 ## 入っているもの
 

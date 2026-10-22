@@ -1,6 +1,6 @@
-# Morphing QR（Magic Tree）
+# GroveQR
 
-URL を立体の木にし、タップすると読み取れる QR コードになるアプリです。
+URL を立体の小さな木立（grove）にし、真上から見ると読み取れる QR コードになるアプリです。
 
 ![夏の木](docs/shots/tree.png)
 
@@ -20,12 +20,10 @@ npm run build
 
 ```text
 src/
-  App.tsx              ハンバーガーでセクション切替
+  App.tsx
   sections/
     TreeSection.tsx    木（気候・樹種・季節）
-    BuildingSection.tsx シンプルな建物
-  scene/               木用の 3D / QR
-  building/            建物用の 3D（木と分離）
+  scene/               3D / QR
   audio/  ui/
 docs/  docs/shots/  public/
 ```

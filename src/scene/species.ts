@@ -1,4 +1,4 @@
-export type SpeciesId = 'oak' | 'pine' | 'willow' | 'birch';
+export type SpeciesId = 'oak' | 'willow' | 'birch';
 
 export interface Species {
   id: SpeciesId;
@@ -19,8 +19,6 @@ export interface Species {
   /** Floor on a branch's vertical direction, low in the trunk and up in the crown. */
   upBiasLow: number;
   upBiasHigh: number;
-  /** Conifers keep a central leader running straight to the tip. */
-  leader: boolean;
   /** Foliage only hangs on branches at least this deep. */
   leafFromDepth: number;
   /** Where along a branch foliage may sit, as a fraction of its length. */
@@ -49,35 +47,12 @@ export const SPECIES: Record<SpeciesId, Species> = {
     radiusDecay: 0.68,
     upBiasLow: 0.28,
     upBiasHigh: -0.18,
-    leader: false,
     leafFromDepth: 3,
     leafAlong: [0.35, 1],
     cluster: [0.45, 1.4],
     clusterYScale: 0.62,
     leafSize: [0.5, 0.95],
     taper: 0.15,
-  },
-  pine: {
-    id: 'pine',
-    label: 'Pine',
-    heightFactor: 0.92,
-    trunkFraction: 0.2,
-    trunkRadius: 0.026,
-    maxDepth: 5,
-    forkChance: 0.75,
-    spread: [1.05, 1.4],
-    lengthDecay: [0.6, 0.74],
-    radiusDecay: 0.6,
-    upBiasLow: -0.12,
-    upBiasHigh: -0.32,
-    leader: true,
-    leafFromDepth: 2,
-    leafAlong: [0.08, 1],
-    cluster: [0.55, 1.2],
-    clusterYScale: 0.6,
-    leafSize: [0.45, 0.82],
-    taper: 0.35,
-    bark: { bark: '#6b5340', barkDark: '#46362a' },
   },
   willow: {
     id: 'willow',
@@ -92,7 +67,6 @@ export const SPECIES: Record<SpeciesId, Species> = {
     radiusDecay: 0.66,
     upBiasLow: 0.06,
     upBiasHigh: -1.05,
-    leader: false,
     leafFromDepth: 3,
     leafAlong: [0.3, 1],
     cluster: [0.42, 1.05],
@@ -113,7 +87,6 @@ export const SPECIES: Record<SpeciesId, Species> = {
     radiusDecay: 0.66,
     upBiasLow: 0.4,
     upBiasHigh: 0.1,
-    leader: false,
     leafFromDepth: 2,
     leafAlong: [0.35, 1],
     cluster: [0.5, 1.2],
@@ -124,4 +97,4 @@ export const SPECIES: Record<SpeciesId, Species> = {
   },
 };
 
-export const SPECIES_ORDER: SpeciesId[] = ['oak', 'pine', 'willow', 'birch'];
+export const SPECIES_ORDER: SpeciesId[] = ['oak', 'willow', 'birch'];

@@ -1,5 +1,5 @@
 {
-  "name": "qr-app",
+  "name": "grove-qr",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -30,6 +30,6 @@
     "vite": "^8.2.2",
     "vitest": "^5.0.0"
   },
-  "description": "An isometric 3D tree whose plot is a scannable QR code.",
+  "description": "GroveQR — a little 3D grove whose plot is a scannable QR code.",
   "license": "MIT"
 }

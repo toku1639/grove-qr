@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MagicTreeScene, type ViewMode } from '../scene';
+import { GroveQrScene } from '../scene';
 import {
   SEASONS,
   SEASON_ORDER,
@@ -28,7 +28,6 @@ import {
   SoundOnIcon,
   SoundOffIcon,
   OakIcon,
-  PineIcon,
   WillowIcon,
   BirchIcon,
   CalmIcon,
@@ -52,7 +51,6 @@ const CLIMATE_ICONS: Record<ClimateId, () => React.ReactElement> = {
 };
 const SPECIES_ICONS: Record<SpeciesId, () => React.ReactElement> = {
   oak: OakIcon,
-  pine: PineIcon,
   willow: WillowIcon,
   birch: BirchIcon,
 };
@@ -63,7 +61,7 @@ const REBUILD_DELAY = 500;
 export function TreeSection() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<MagicTreeScene | null>(null);
+  const sceneRef = useRef<GroveQrScene | null>(null);
   const ambienceRef = useRef<Ambience | null>(null);
 
   const [draft, setDraft] = useState(DEFAULT_URL);
@@ -73,7 +71,6 @@ export function TreeSection() {
   const [species, setSpecies] = useState<SpeciesId>('oak');
   const [blossom, setBlossom] = useState<BlossomId>('sakura');
   const [autumnTint, setAutumnTint] = useState<AutumnId>('amber');
-  const [mode, setMode] = useState<ViewMode>('tree');
   const [muted, setMuted] = useState(true);
   const [showInfo, setShowInfo] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -94,7 +91,11 @@ export function TreeSection() {
     let tinted = base;
     if (season === 'spring') {
       const swatch = BLOSSOM_SWATCHES.find((s) => s.id === blossom) ?? BLOSSOM_SWATCHES[0];
-      tinted = { ...base, leaf: [...swatch.leaf], qrLeaf: [...swatch.qr] };
+      tinted = {
+        ...base,
+        leaf: [...swatch.leaf],
+        qrLeaf: [...swatch.qr],
+      };
     } else if (season === 'autumn') {
       const swatch = AUTUMN_SWATCHES.find((s) => s.id === autumnTint) ?? AUTUMN_SWATCHES[0];
       tinted = {
@@ -117,7 +118,7 @@ export function TreeSection() {
 
   useEffect(() => {
     if (!canvasRef.current) return;
-    const scene = new MagicTreeScene(canvasRef.current, committed, palette, SPECIES[species]);
+    const scene = new GroveQrScene(canvasRef.current, committed, palette, SPECIES[species]);
     sceneRef.current = scene;
 
     const onResize = () => scene.resize();
@@ -145,10 +146,6 @@ export function TreeSection() {
   useEffect(() => {
     sceneRef.current?.setText(committed);
   }, [committed]);
-
-  useEffect(() => {
-    sceneRef.current?.setMode(mode);
-  }, [mode]);
 
   useEffect(() => {
     sceneRef.current?.setSpecies(species);
@@ -187,14 +184,6 @@ export function TreeSection() {
 
   // ---- interactions ------------------------------------------------------
 
-  const toggleMode = useCallback(() => {
-    setMode((m) => {
-      const next: ViewMode = m === 'tree' ? 'code' : 'tree';
-      if (next === 'code') ambienceRef.current?.chord();
-      return next;
-    });
-  }, []);
-
   const toggleSound = useCallback(() => {
     const on = ambienceRef.current?.toggle() ?? false;
     setMuted(!on);
@@ -203,8 +192,8 @@ export function TreeSection() {
   const share = useCallback(async () => {
     const url = committed;
     const payload = {
-      title: 'Magic Tree',
-      text: 'A tree that is also a scannable QR code.',
+      title: 'GroveQR',
+      text: 'A little grove that is also a scannable QR code.',
       url,
     };
     try {
@@ -220,26 +209,14 @@ export function TreeSection() {
     }
   }, [committed]);
 
-  const onCanvasKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      toggleMode();
-    }
-  };
-
-  const hint =
-    mode === 'tree'
-      ? finePointer
-        ? 'Click the tree to see the QR code'
-        : 'Tap the tree to see the QR code'
-      : finePointer
-        ? 'Click to see the tree'
-        : 'Tap to see the tree';
+  const hint = finePointer
+    ? 'Drag to orbit · look straight down to scan'
+    : 'Drag to orbit · top-down hides the tree so the QR can scan';
 
   return (
     <div className="stage stage--tree" style={{ background: palette.ground }}>
       <div className="section-badge" aria-hidden="true">
-        Tree
+        GroveQR
       </div>
 
       <div className="info">
@@ -253,18 +230,19 @@ export function TreeSection() {
           <InfoIcon />
         </button>
         {showInfo && (
-          <div className="info__card" role="dialog" aria-label="About Magic Tree">
+          <div className="info__card" role="dialog" aria-label="About GroveQR">
             <p>
-              The plot under the tree <em>is</em> the QR code. Tap it and the canopy
-              settles leaf by leaf into the dark modules.
+              Leaves sit on the data modules; the three finder corners are grass
+              at the plot edge. Together they are the QR from above — nothing
+              rearranges when you look down.
             </p>
             <p>
-              Encoded at error-correction level H, with a clear four-module quiet
-              zone, so the result actually scans.
+              Encoded at error-correction level H so the canopy can sit on the
+              code and the result still scans.
             </p>
             <p>
-              An original, open-source take on the isometric QR-tree idea. Built with
-              React and three.js.
+              GroveQR — an original, open-source take on the isometric QR-tree
+              idea. Built with React and three.js.
             </p>
           </div>
         )}
@@ -273,19 +251,15 @@ export function TreeSection() {
       <canvas
         ref={canvasRef}
         className="stage__canvas"
-        role="button"
-        tabIndex={0}
         aria-label={hint}
-        onClick={toggleMode}
-        onKeyDown={onCanvasKey}
       />
 
       <div className="dock" ref={dockRef}>
         <div className="dock__toast-anchor">
           {toast && <div className="toast">{toast}</div>}
-          <button className="hint" type="button" onClick={toggleMode}>
+          <div className="hint" role="status">
             {hint}
-          </button>
+          </div>
         </div>
 
         <div className="field">

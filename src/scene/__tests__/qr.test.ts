@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildQr, moduleToWorld, QUIET_ZONE } from '../qr';
-import { leafTarget, leafCountFor } from '../moduleLayout';
+import { leafTarget, leafCountFor, foliageCells } from '../moduleLayout';
 import { LEAVES_PER_MODULE } from '../constants';
 import { growTree } from '../tree';
 import { SPECIES, SPECIES_ORDER } from '../species';
@@ -8,11 +8,11 @@ import { hashString, makeRng } from '../rng';
 
 const SAMPLES = [
   'hi',
-  'Magic Tree',
+  'GroveQR',
   'hello world',
   'https://example.com',
   'https://github.com/anthropics',
-  'https://a-much-longer-example-domain.co.uk/path/to/page?ref=magic-tree',
+  'https://a-much-longer-example-domain.co.uk/path/to/page?ref=grove-qr',
 ];
 
 describe('buildQr', () => {
@@ -60,7 +60,7 @@ describe('buildQr', () => {
 });
 
 describe('leaf targets', () => {
-  it('gives every dark module exactly LEAVES_PER_MODULE leaves', () => {
+  it('gives every non-finder dark module exactly LEAVES_PER_MODULE leaves', () => {
     for (const text of SAMPLES) {
       const qr = buildQr(text);
       const perCell = new Map<string, number>();
@@ -74,12 +74,12 @@ describe('leaf targets', () => {
         perCell.set(key, (perCell.get(key) ?? 0) + 1);
       }
 
-      expect(perCell.size).toBe(qr.darkCells.length);
+      expect(perCell.size).toBe(foliageCells(qr).length);
       for (const count of perCell.values()) expect(count).toBe(LEAVES_PER_MODULE);
     }
   });
 
-  it('only ever lands leaves on dark modules, never the quiet zone', () => {
+  it('only ever lands leaves on non-finder dark modules, never quiet zone', () => {
     for (const text of SAMPLES) {
       const qr = buildQr(text);
       for (let i = 0; i < leafCountFor(qr); i++) {
@@ -95,6 +95,7 @@ describe('leaf targets', () => {
         const qx = mx - QUIET_ZONE;
         const qz = mz - QUIET_ZONE;
         expect(qr.dark[qz * qr.size + qx]).toBe(true);
+        expect(qr.reserved[qz * qr.size + qx]).toBe(false);
       }
     }
   });
@@ -111,7 +112,7 @@ describe('leaf targets', () => {
   });
 
   it('gives every module block the same height, so all top faces light equally', () => {
-    const qr = buildQr('Magic Tree');
+    const qr = buildQr('GroveQR');
     const ys = new Set<number>();
     const heights = new Set<number>();
     for (let i = 0; i < leafCountFor(qr); i++) {
@@ -186,26 +187,24 @@ describe('species', () => {
   });
 
   it('gives each species a distinct silhouette', () => {
-    // Match how the canopy actually calls it: plot width scaled by heightFactor.
+    expect(SPECIES.willow.heightFactor).toBeLessThan(SPECIES.oak.heightFactor);
+    expect(SPECIES.birch.taper).toBeGreaterThan(SPECIES.oak.taper);
+    expect(SPECIES.willow.clusterYScale).toBeGreaterThan(SPECIES.oak.clusterYScale);
+
     const shape = (id: (typeof SPECIES_ORDER)[number]) => {
       const sp = SPECIES[id];
       const tree = growTree(99, { ...opts, height: 37 * sp.heightFactor, species: sp });
       let maxR = 0;
       for (const l of tree.leaves) maxR = Math.max(maxR, Math.hypot(l.x, l.z));
-      return { ratio: maxR / tree.height, height: tree.height };
+      return { ratio: maxR / tree.height };
     };
-    const oak = shape('oak');
-    const pine = shape('pine');
-    const birch = shape('birch');
-
-    // A conifer is markedly narrower for its height than a broadleaf.
-    expect(pine.ratio).toBeLessThan(oak.ratio);
-    expect(birch.ratio).toBeLessThan(oak.ratio);
-    expect(pine.height).toBeGreaterThan(oak.height);
+    // Birch pinches more; oak stays the broadest crown for its height.
+    expect(shape('birch').ratio).toBeLessThan(shape('oak').ratio);
   });
 
-  it('tapers the crown of a conifer', () => {
-    const tree = growTree(7, { ...opts, species: SPECIES.pine });
+  it('tapers a high-taper crown toward the tip', () => {
+    const sp = { ...SPECIES.oak, taper: 0.9 };
+    const tree = growTree(7, { ...opts, species: sp });
     const spreadAt = (lo: number, hi: number) => {
       const band = tree.leaves.filter((l) => l.y >= tree.height * lo && l.y < tree.height * hi);
       if (!band.length) return 0;

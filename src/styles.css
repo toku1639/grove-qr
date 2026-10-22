@@ -310,7 +310,7 @@ button { font: inherit; color: inherit; }
   justify-content: center;
   text-align: center;
   min-height: 34px;
-  max-width: min(92vw, 360px);
+  max-width: min(92vw, 420px);
   padding: 8px 14px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--line);
@@ -320,10 +320,7 @@ button { font: inherit; color: inherit; }
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.012em;
-  cursor: pointer;
-  transition: border-color 0.18s ease, transform 0.18s ease;
 }
-.hint:hover { border-color: var(--line-strong); transform: translateY(-1px); }
 
 .field {
   display: flex;
@@ -588,8 +585,12 @@ button { font: inherit; color: inherit; }
 
 @media (max-width: 420px) {
   .brand__text { display: none; }
-  .tree__label { display: none; }
-  .tree { gap: 0; }
+  .tree {
+    font-size: 11px;
+    gap: 4px;
+    padding: 0 4px;
+  }
+  .tree svg { width: 13px; height: 13px; }
 }
 
 /* Narrow enough that "Summer" would ellipsise: shrink rather than truncate. */

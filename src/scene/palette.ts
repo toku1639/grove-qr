@@ -5,13 +5,11 @@ export interface Palette {
   label: string;
   /** Canopy colours, sampled per leaf. */
   leaf: string[];
-  /** Darker, high-contrast tones used once the leaves settle into QR modules. */
+  /** Extra foliage tones (kept for swatches / future use). */
   qrLeaf: string[];
   bark: string;
   barkDark: string;
   hedge: string[];
-  /** Colour of the raised (dark) QR modules on the ground slab. */
-  moduleDark: string;
   moduleLight: string;
   slab: string;
   ground: string;
@@ -118,7 +116,6 @@ export const SEASONS: Record<SeasonId, Palette> = {
     bark: '#8a6a4e',
     barkDark: '#5f4733',
     hedge: ['#8fbf6a', '#7bad57', '#a2cd7e'],
-    moduleDark: '#d6d1c4',
     moduleLight: '#fdfbf6',
     slab: '#cfc9bb',
     ground: '#f6f1e7',
@@ -131,7 +128,6 @@ export const SEASONS: Record<SeasonId, Palette> = {
     bark: '#8a6a4e',
     barkDark: '#5f4733',
     hedge: ['#7ec25a', '#6bb047', '#93d06f'],
-    moduleDark: '#d6d1c4',
     moduleLight: '#fdfbf6',
     slab: '#cfc9bb',
     ground: '#f6f1e7',
@@ -144,7 +140,6 @@ export const SEASONS: Record<SeasonId, Palette> = {
     bark: '#6f5540',
     barkDark: '#4a382a',
     hedge: ['#dcb84a', '#c9a437', '#e8cc6a'],
-    moduleDark: '#d6d1c4',
     moduleLight: '#fdfbf6',
     slab: '#cfc9bb',
     ground: '#f6f1e7',
@@ -158,7 +153,6 @@ export const SEASONS: Record<SeasonId, Palette> = {
     bark: '#6a5848',
     barkDark: '#43362c',
     hedge: ['#c9d6df', '#b7c7d2', '#dce5ec'],
-    moduleDark: '#d0d6dc',
     moduleLight: '#f7f9fb',
     slab: '#c5ced6',
     ground: '#e8eef4',

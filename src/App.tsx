@@ -8,8 +8,8 @@ export default function App() {
         <div className="chrome__brand" aria-hidden="true">
           <BrandMark />
           <span className="chrome__titles">
-            <span className="chrome__name">Morphing QR</span>
-            <span className="chrome__section">Tree</span>
+            <span className="chrome__name">GroveQR</span>
+            <span className="chrome__section">3D Code</span>
           </span>
         </div>
       </header>

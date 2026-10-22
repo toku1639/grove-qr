@@ -1,10 +1,12 @@
 import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildQr, type QrMatrix } from './qr';
 import { buildPlot, type PlotMeshes } from './plot';
 import { buildCanopy, type Canopy } from './canopy';
 import { buildMotes, type Motes } from './motes';
-import { CELL, HEDGE_RING, ISO_AZIMUTH, ISO_ELEVATION, TOP_ELEVATION } from './constants';
-import { clamp01, lerp, easeInOutCubic } from './rng';
+import { buildFauna, type Fauna } from './fauna';
+import { CELL, ISO_AZIMUTH, ISO_ELEVATION } from './constants';
+import { clamp01, lerp } from './rng';
 import type { Palette } from './palette';
 import { SPECIES, type Species, type SpeciesId } from './species';
 import { CLIMATES, type ClimateId } from './climate';
@@ -12,13 +14,15 @@ import { CLIMATES, type ClimateId } from './climate';
 export type ViewMode = 'tree' | 'code';
 export type { ClimateId };
 
-/** Seconds for a full canopy <-> code transition. */
-const MORPH_SECONDS = 0.95;
-
-export class MagicTreeScene {
+/**
+ * Free-orbit orthographic scene. Leaves already sit on dark modules, so a
+ * top-down look is the QR — no click morph / rearrange.
+ */
+export class GroveQrScene {
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
   private camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+  private controls: OrbitControls;
   private key: THREE.DirectionalLight;
   private ambient: THREE.AmbientLight;
   private hemi: THREE.HemisphereLight;
@@ -26,30 +30,21 @@ export class MagicTreeScene {
   private plot!: PlotMeshes;
   private canopy!: Canopy;
   private motes!: Motes;
+  private fauna!: Fauna;
   private qr!: QrMatrix;
   private world = new THREE.Group();
-  private target = new THREE.Vector3();
-  private offset = new THREE.Vector3();
-  private forward = new THREE.Vector3();
-  private screenUp = new THREE.Vector3();
 
   private palette: Palette;
   private species: Species;
   private climate: ClimateId = 'calm';
-  private morph = 0;
-  private morphTarget = 0;
   private lastTime = 0;
   private elapsed = 0;
   private raf = 0;
   private frame = 0;
   private disposed = false;
 
-  private isoHalfW = 20;
-  private isoHalfV = 20;
-  private isoCenter = new THREE.Vector3();
-  private rimUnits = 40;
-  /** Height of the control dock in CSS px, reported by the UI. */
   private dockPx = 200;
+  private orthoHalf = 20;
 
   onMorphChange?: (t: number) => void;
 
@@ -71,44 +66,54 @@ export class MagicTreeScene {
       alpha: false,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
     this.scene.background = new THREE.Color(palette.ground);
 
     this.ambient = new THREE.AmbientLight(0xffffff, 0.62);
     this.hemi = new THREE.HemisphereLight(0xffffff, 0xd8cfbe, 0.5);
     this.key = new THREE.DirectionalLight(0xfff6e6, 1.15);
     this.key.castShadow = true;
-    this.key.shadow.mapSize.set(2048, 2048);
+    this.key.shadow.mapSize.set(1024, 1024);
     this.key.shadow.bias = -0.0006;
     this.scene.add(this.ambient, this.hemi, this.key, this.key.target);
-
     this.scene.add(this.world);
+
+    this.controls = new OrbitControls(this.camera, canvas);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.08;
+    this.controls.enablePan = false;
+    this.controls.minPolarAngle = 0.08;
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.04;
+    this.controls.rotateSpeed = 0.85;
+    // Ortho "zoom" via changing the frustum — OrbitControls zoom still works
+    // by dollying; we re-fit frustum from camera distance each frame.
+    this.controls.minDistance = 40;
+    this.controls.maxDistance = 420;
+
     this.build(text);
     this.resize();
     this.lastTime = performance.now();
     this.loop();
 
     if (import.meta.env.DEV) {
-      (window as unknown as { __magicTree?: MagicTreeScene }).__magicTree = this;
+      (window as unknown as { __groveQr?: GroveQrScene }).__groveQr = this;
     }
   }
-
-  // ---------------------------------------------------------------- build
 
   private build(text: string) {
     this.qr = buildQr(text);
     this.plot = buildPlot(this.qr, this.palette);
     this.canopy = buildCanopy(this.qr, this.palette, this.species);
     this.motes = buildMotes(this.qr, this.palette);
-    this.world.add(this.plot.group, this.canopy.group, this.motes.points);
+    this.fauna = buildFauna(this.qr, this.palette);
+    this.world.add(this.plot.group, this.canopy.group, this.motes.points, this.fauna.group);
 
-    const rim = (this.qr.plot + HEDGE_RING * 2) * CELL;
-    this.rimUnits = rim;
-    this.measureIsoFraming(rim);
+    const rim = this.qr.plot * CELL;
+    this.orthoHalf = rim * 0.78;
 
-    const shadowExtent = rim * 0.8;
+    const shadowExtent = rim * 0.85;
     const cam = this.key.shadow.camera;
     cam.left = -shadowExtent;
     cam.right = shadowExtent;
@@ -118,88 +123,43 @@ export class MagicTreeScene {
     cam.far = 400;
     cam.updateProjectionMatrix();
 
-    this.canopy.setMorph(this.morph, 0);
+    const aimY = this.canopy.model.canopyTop * 0.35;
+    this.controls.target.set(0, aimY, 0);
+    const r = 220;
+    this.camera.position.set(
+      r * Math.cos(ISO_ELEVATION) * Math.sin(ISO_AZIMUTH),
+      r * Math.sin(ISO_ELEVATION),
+      r * Math.cos(ISO_ELEVATION) * Math.cos(ISO_AZIMUTH),
+    );
+    this.controls.update();
+
+    this.canopy.setMorph(0, 0);
+    this.plot.setMorph(0);
     this.applyClimate();
+    this.updateCamera(true);
   }
 
   private applyClimate() {
     const profile = CLIMATES[this.climate];
     this.canopy.setWind(profile.wind);
-    // Winter always snows — calm/wind only change how hard the tree sways.
     const weather = this.palette.id === 'winter' ? 'snow' : this.climate;
     this.motes.setClimate(weather);
     this.motes.setGust(this.palette.id === 'winter' && this.climate === 'wind' ? 1.7 : 1);
   }
 
-  /**
-   * Measures the scene's screen-space extent at the isometric angle by
-   * projecting the plot corners and the canopy's bounding box onto the camera's
-   * own screen axes.
-   *
-   * It records the content's midpoint as well as its size. Sizing around an
-   * assumed target instead leaves an asymmetric canopy visibly off-centre.
-   */
-  private measureIsoFraming(rim: number) {
-    const { canopyTop, canopyRadius } = this.canopy.model;
-
-    const dir = new THREE.Vector3(
-      Math.cos(ISO_ELEVATION) * Math.sin(ISO_AZIMUTH),
-      Math.sin(ISO_ELEVATION),
-      Math.cos(ISO_ELEVATION) * Math.cos(ISO_AZIMUTH),
-    ).normalize();
-    const forward = dir.clone().negate();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
-
-    const half = rim / 2;
-    const points: THREE.Vector3[] = [
-      new THREE.Vector3(-half, 0, -half),
-      new THREE.Vector3(half, 0, -half),
-      new THREE.Vector3(-half, 0, half),
-      new THREE.Vector3(half, 0, half),
-    ];
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        points.push(new THREE.Vector3(sx * canopyRadius, 0, sz * canopyRadius));
-        points.push(new THREE.Vector3(sx * canopyRadius, canopyTop, sz * canopyRadius));
-      }
-    }
-
-    let wMin = Infinity;
-    let wMax = -Infinity;
-    let vMin = Infinity;
-    let vMax = -Infinity;
-    for (const pt of points) {
-      const w = pt.dot(right);
-      const v = pt.dot(up);
-      wMin = Math.min(wMin, w);
-      wMax = Math.max(wMax, w);
-      vMin = Math.min(vMin, v);
-      vMax = Math.max(vMax, v);
-    }
-
-    this.isoHalfW = (wMax - wMin) / 2;
-    this.isoHalfV = (vMax - vMin) / 2;
-    // A world point that projects to the middle of the content.
-    this.isoCenter
-      .set(0, 0, 0)
-      .addScaledVector(right, (wMin + wMax) / 2)
-      .addScaledVector(up, (vMin + vMax) / 2);
-  }
-
   private teardown() {
-    this.world.remove(this.plot.group, this.canopy.group, this.motes.points);
+    this.world.remove(this.plot.group, this.canopy.group, this.motes.points, this.fauna.group);
     this.canopy.dispose();
     this.motes.dispose();
+    this.fauna.dispose();
     this.plot.group.traverse((o) => {
       const mesh = o as THREE.Mesh;
       mesh.geometry?.dispose();
-      const mat = mesh.material as THREE.Material | undefined;
-      mat?.dispose();
+      const mat = mesh.material as THREE.Material | THREE.Material[] | undefined;
+      if (Array.isArray(mat)) mat.forEach((m) => m.dispose());
+      else mat?.dispose();
     });
   }
-
-  // ----------------------------------------------------------------- api
 
   setText(text: string) {
     if (text === this.qr.text) return;
@@ -211,9 +171,8 @@ export class MagicTreeScene {
     const next = typeof species === 'string' ? SPECIES[species] : species;
     if (next.id === this.species.id) return;
     this.species = next;
-    const text = this.qr.text;
     this.teardown();
-    this.build(text);
+    this.build(this.qr.text);
   }
 
   setClimate(climate: ClimateId) {
@@ -222,7 +181,6 @@ export class MagicTreeScene {
     this.applyClimate();
   }
 
-  /** The UI measures its own dock so the code is always framed clear of it. */
   setDockHeight(px: number) {
     const next = Math.max(0, px);
     if (Math.abs(next - this.dockPx) < 1) return;
@@ -236,23 +194,23 @@ export class MagicTreeScene {
     this.plot.applyPalette(palette);
     this.canopy.applyPalette(palette);
     this.motes.applyPalette(palette);
+    this.fauna.applyPalette(palette);
     this.applyClimate();
   }
 
-  setMode(mode: ViewMode) {
-    this.morphTarget = mode === 'code' ? 1 : 0;
+  /** Kept for UI compat — free-orbit design has no pose morph. */
+  setMode(_mode: ViewMode) {
+    this.onMorphChange?.(0);
   }
 
   toggleMode() {
-    this.morphTarget = this.morphTarget > 0.5 ? 0 : 1;
-    return this.morphTarget > 0.5 ? 'code' : 'tree';
+    return 'tree' as ViewMode;
   }
 
   get mode(): ViewMode {
-    return this.morphTarget > 0.5 ? 'code' : 'tree';
+    return 'tree';
   }
 
-  /** PNG of the current framing, for download/share. */
   snapshot(): string {
     this.renderer.render(this.scene, this.camera);
     return this.canvas.toDataURL('image/png');
@@ -268,94 +226,74 @@ export class MagicTreeScene {
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
+    this.controls.dispose();
     this.teardown();
     this.renderer.dispose();
   }
 
-  // -------------------------------------------------------------- camera
-
   /**
-   * Frames the crown in the iso view and, in the top-down view, fits the whole
-   * plot into the area *above* the control dock so no UI ever covers a module.
+   * How close the view is to straight top-down (0 = oblique, 1 = overhead).
+   * Used to flatten lights and tuck finder grass for scanning.
    */
+  private topDownAmount() {
+    // OrbitControls: polar 0 = straight overhead.
+    // Stay fully "tree" through the usual iso band; only climb toward QR
+    // once the camera is clearly looking down.
+    const polar = this.controls.getPolarAngle();
+    return clamp01(1 - (polar - 0.1) / 0.42);
+  }
+
   private updateCamera(force = false) {
-    // The camera runs on an eased copy of the morph so the swing eases in and
-    // out instead of starting and stopping dead.
-    const t = easeInOutCubic(this.morph);
     const w = this.canvas.clientWidth || 1;
     const h = this.canvas.clientHeight || 1;
     const aspect = w / h;
+    // Clear the dock without parking the plot under the top edge.
+    const dockPx = Math.min(this.dockPx + 12, h * 0.48);
+    const usable = Math.max(h - dockPx, h * 0.42);
+    const top = this.topDownAmount();
 
-    const margin = 1.05;
-    const dockPx = Math.min(this.dockPx + 18, h * 0.5);
-    const usable = Math.max(h - dockPx, h * 0.4);
+    // Zoom from orbit distance
+    const dist = this.camera.position.distanceTo(this.controls.target);
+    const zoom = clamp01((dist - 40) / (420 - 40));
+    const baseHalf = lerp(this.orthoHalf * 0.55, this.orthoHalf * 1.35, zoom);
+    // Mild overhead pull-back — enough to clear UI, not a big empty frame.
+    const scanHalf = this.orthoHalf * lerp(1, 1.06, top);
+    const half = lerp(baseHalf, Math.max(baseHalf, scanHalf), top);
+    const fitH = (half * h) / usable;
+    const fitW = half;
+    const viewHalf = Math.max(fitH, fitW) * 1.02;
 
-    // Both framings use one fit: size the content to the strip *above* the dock,
-    // then shift the camera so that strip — not the whole viewport — is what
-    // ends up centred. Fitting to the full height and nudging afterwards is what
-    // left the scene low with a void above it on tall, narrow screens.
-    const fit = (halfW: number, halfV: number) => {
-      const half = Math.max(halfV * (h / usable), halfW / aspect) * margin;
-      return { half, shift: (half * dockPx) / h };
-    };
-
-    const isoFit = fit(this.isoHalfW, this.isoHalfV);
-    const halfRim = this.rimUnits / 2;
-    const topFit = fit(halfRim, halfRim);
-
-    const half = lerp(isoFit.half, topFit.half, t);
-    const shift = lerp(isoFit.shift, topFit.shift, t);
-
-    this.camera.left = -half * aspect;
-    this.camera.right = half * aspect;
-    this.camera.top = half;
-    this.camera.bottom = -half;
-    this.camera.near = -600;
-    this.camera.far = 600;
+    // Soft lift only — full dockFrac shift left a bald strip at the top.
+    const screenShift = viewHalf * (dockPx / h) * lerp(0.35, 0.55, top);
+    this.camera.left = -viewHalf * aspect;
+    this.camera.right = viewHalf * aspect;
+    this.camera.top = viewHalf - screenShift;
+    this.camera.bottom = -viewHalf - screenShift;
+    this.camera.near = -800;
+    this.camera.far = 800;
     this.camera.updateProjectionMatrix();
 
-    const azimuth = lerp(ISO_AZIMUTH, 0, t);
-    const elevation = lerp(ISO_ELEVATION, TOP_ELEVATION, t);
-    const r = 220;
+    if (force) {
+      this.controls.target.y = this.canopy.model.canopyTop * lerp(0.3, 0.08, top);
+    }
 
-    this.offset.set(
-      r * Math.cos(elevation) * Math.sin(azimuth),
-      r * Math.sin(elevation),
-      r * Math.cos(elevation) * Math.cos(azimuth),
-    );
+    // Keep tree lighting while the canopy is visible — morphing key→ambient
+    // was washing the leaf colours. Flat scan light only once foliage is gone.
+    const lightBlend = clamp01((top - 0.88) / 0.12);
+    this.key.intensity = lerp(1.15, 0.02, lightBlend);
+    this.ambient.intensity = lerp(0.62, 2.2, lightBlend);
+    this.hemi.intensity = lerp(0.5, 0.05, lightBlend);
+    this.key.castShadow = lightBlend < 0.5;
+    this.renderer.shadowMap.enabled = lightBlend < 0.5;
+    this.key.position.set(-60, 120, 70).add(this.controls.target);
+    this.key.target.position.copy(this.controls.target);
+    this.key.target.updateMatrixWorld();
 
-    // Screen-up in world space, so the dock shift works at any camera angle.
-    this.forward.copy(this.offset).normalize().negate();
-    this.screenUp
-      .set(0, 1, 0)
-      .addScaledVector(this.forward, -this.forward.y)
-      .normalize();
-
-    // Aim at the content's midpoint, easing to the plot centre for the code
-    // view, then slide up by the dock offset.
-    this.target
-      .copy(this.isoCenter)
-      .multiplyScalar(1 - t)
-      .addScaledVector(this.screenUp, -shift);
-    this.camera.position.copy(this.target).add(this.offset);
-    this.camera.up.set(0, 1, 0);
-    this.camera.lookAt(this.target);
+    // Finder grass stays — it is part of the code with the leaves.
+    this.plot.setMorph(top);
 
     if (force) this.camera.updateMatrixWorld();
-
-    // Flatten the lighting as the code resolves so no shadow crosses a module.
-    // Blown-out light modules and near-black dark ones is exactly what a
-    // scanner's binariser wants, so push the ambient hard at the end.
-    this.key.intensity = lerp(1.15, 0.14, t);
-    this.ambient.intensity = lerp(0.62, 2.45, t);
-    this.hemi.intensity = lerp(0.5, 0.18, t);
-    this.key.castShadow = t < 0.6;
-    this.key.position.set(-60, 120, 70).add(this.target);
-    this.key.target.position.copy(this.target);
-    this.key.target.updateMatrixWorld();
   }
-
-  // ---------------------------------------------------------------- loop
 
   private loop = () => {
     if (this.disposed) return;
@@ -365,24 +303,16 @@ export class MagicTreeScene {
     const dt = Math.min((now - this.lastTime) / 1000, 0.05);
     this.lastTime = now;
     this.elapsed += dt;
-    const time = this.elapsed;
 
-    if (this.morph !== this.morphTarget) {
-      const step = dt / MORPH_SECONDS;
-      const dir = Math.sign(this.morphTarget - this.morph);
-      this.morph = clamp01(
-        dir > 0 ? Math.min(this.morph + step, this.morphTarget)
-                : Math.max(this.morph - step, this.morphTarget),
-      );
-      this.onMorphChange?.(this.morph);
-    }
-
-    // Idle sway only matters while the canopy is up; skip work once settled.
-    const idle = this.morph < 0.999;
-    if (idle || this.frame < 2) this.canopy.setMorph(this.morph, time);
-    this.motes.update(dt, time, 1 - this.morph);
-
+    this.controls.update();
     this.updateCamera();
+    const top = this.topDownAmount();
+    this.canopy.setMorph(top, this.elapsed);
+    const weatherVis = Math.max(0, 1 - top * 1.4);
+    // Kill weather motes early — they read as 3D noise on the code.
+    this.motes.update(dt, this.elapsed, weatherVis);
+    this.fauna.update(dt, this.elapsed, weatherVis);
+
     this.renderer.render(this.scene, this.camera);
     this.frame++;
   };

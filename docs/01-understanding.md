@@ -1,4 +1,4 @@
-# 3D Morphing QR Studio — 理解メモ
+# GroveQR — 理解メモ
 
 壁打ちメモ。仕様書で描いたイメージに、参考動画で見えた画面を重ねたもの。動画の分解は `02-reference-video.md`。
 
@@ -6,7 +6,7 @@
 
 ## いまの本体
 
-`magic-tree` をルートに据えた。古い Next.js 試作と `every-qrcode` 同梱物は削除済み。
+`GroveQR`（旧 magic-tree ベース）をルートに据えた。古い Next.js 試作と `every-qrcode` 同梱物は削除済み。
 
 ## 理解度
 

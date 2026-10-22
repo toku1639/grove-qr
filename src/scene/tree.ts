@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 import { makeRng, lerp, clamp01, type Rng } from './rng';
 import type { Species } from './species';
 
@@ -34,7 +34,6 @@ export interface GrowOptions {
  * Everything is driven by `rng`, so the same URL always yields the same tree.
  */
 export function growTree(seed: number, opts: GrowOptions): TreeModel {
-  if (opts.species.leader) return growConifer(seed, opts);
   const sp = opts.species;
   const rng = makeRng(seed);
   const branches: Branch[] = [];
@@ -47,7 +46,6 @@ export function growTree(seed: number, opts: GrowOptions): TreeModel {
     length: number,
     radius: number,
     depth: number,
-    onAxis: boolean,
   ) => {
     const end = start.clone().addScaledVector(dir, length);
     branches.push({ start: start.clone(), end, radius, depth });
@@ -57,14 +55,7 @@ export function growTree(seed: number, opts: GrowOptions): TreeModel {
     const children = depth === 0 ? 3 : rng() < sp.forkChance ? 3 : 2;
 
     for (let i = 0; i < children; i++) {
-      // Conifers keep ONE central leader running straight up, and only along the
-      // main axis. Letting every branch spawn its own leader turns the tree into
-      // an upward broom instead of a fir.
-      const isLeader = sp.leader && onAxis && i === 0;
-
-      const angle = isLeader
-        ? lerp(0.05, 0.16, rng())
-        : lerp(sp.spread[0], sp.spread[1], rng()) * (depth === 0 ? 0.62 : 1);
+      const angle = lerp(sp.spread[0], sp.spread[1], rng()) * (depth === 0 ? 0.62 : 1);
 
       // The first two rings are spaced evenly around the compass. Left purely to
       // chance the trunk throws all its weight to one side and the tree leans.
@@ -75,15 +66,11 @@ export function growTree(seed: number, opts: GrowOptions): TreeModel {
 
       const next = dir.clone().applyAxisAngle(axis, angle);
       const floor = depth < 3 ? sp.upBiasLow : sp.upBiasHigh;
-      if (isLeader) next.y = Math.max(next.y, 0.85);
-      else next.y = Math.max(next.y, floor);
+      next.y = Math.max(next.y, floor);
       next.normalize();
 
-      const decay = isLeader
-        ? lerp(0.78, 0.88, rng())
-        : lerp(sp.lengthDecay[0], sp.lengthDecay[1], rng());
-
-      grow(end, next, length * decay, radius * sp.radiusDecay, depth + 1, isLeader);
+      const decay = lerp(sp.lengthDecay[0], sp.lengthDecay[1], rng());
+      grow(end, next, length * decay, radius * sp.radiusDecay, depth + 1);
     }
   };
 
@@ -93,7 +80,6 @@ export function growTree(seed: number, opts: GrowOptions): TreeModel {
     trunkLen,
     opts.height * sp.trunkRadius,
     0,
-    true,
   );
 
   const height = branches.reduce((m, b) => Math.max(m, b.end.y), 0);
@@ -103,84 +89,12 @@ export function growTree(seed: number, opts: GrowOptions): TreeModel {
 }
 
 /**
- * A conifer is a straight leader hung with whorls of side branches that shorten
- * toward the top. Modelling that directly gives far better control of the cone
- * than tuning the broadleaf recursion into submission.
- */
-function growConifer(seed: number, opts: GrowOptions): TreeModel {
-  const sp = opts.species;
-  const rng = makeRng(seed);
-  const branches: Branch[] = [];
-
-  const height = opts.height;
-  const trunkR = opts.height * sp.trunkRadius;
-  const whorls = 11;
-  const canopyBase = height * 0.16;
-  const baseSpan = height * 0.34;
-
-  // Trunk, in segments so it can taper.
-  const segs = whorls + 1;
-  for (let i = 0; i < segs; i++) {
-    const y0 = (height * i) / segs;
-    const y1 = (height * (i + 1)) / segs;
-    const lean = 0.04 * height;
-    branches.push({
-      start: new THREE.Vector3(Math.sin(i * 0.7) * lean * 0.06, y0, 0),
-      end: new THREE.Vector3(Math.sin((i + 1) * 0.7) * lean * 0.06, y1, 0),
-      radius: trunkR * (1 - (i / segs) * 0.75),
-      depth: i === 0 ? 0 : 1,
-    });
-  }
-
-  for (let w = 0; w < whorls; w++) {
-    const f = w / (whorls - 1);
-    const y = canopyBase + (height - canopyBase) * f;
-    // Span shrinks toward the tip; that ratio is the cone.
-    const span = baseSpan * (1 - f * 0.92) + 0.4;
-    const arms = 5 + Math.floor(rng() * 3);
-    const twist = rng() * Math.PI * 2;
-
-    for (let a = 0; a < arms; a++) {
-      const az = twist + (a / arms) * Math.PI * 2 + (rng() - 0.5) * 0.35;
-      const len = span * lerp(0.8, 1.15, rng());
-      const droop = len * lerp(0.18, 0.42, rng());
-      const start = new THREE.Vector3(0, y, 0);
-      const end = new THREE.Vector3(
-        Math.cos(az) * len,
-        y - droop,
-        Math.sin(az) * len,
-      );
-      branches.push({ start, end, radius: trunkR * 0.3 * (1 - f * 0.6), depth: 2 });
-
-      // One short forward fork keeps the whorl from looking like spokes.
-      if (rng() < 0.75) {
-        const mid = start.clone().lerp(end, 0.55);
-        const tip = end
-          .clone()
-          .add(new THREE.Vector3(Math.cos(az + 0.5) * len * 0.4, -droop * 0.4, Math.sin(az + 0.5) * len * 0.4));
-        branches.push({ start: mid, end: tip, radius: trunkR * 0.2 * (1 - f * 0.6), depth: 3 });
-      }
-    }
-  }
-
-  const treeHeight = branches.reduce((m, b) => Math.max(m, b.end.y), 0);
-  const { leaves, leafScales } = scatterLeaves(branches, opts.leafCount, treeHeight, sp, rng);
-  return {
-    branches,
-    leaves,
-    leafScales,
-    height: treeHeight,
-    ...canopyBounds(leaves, leafScales, treeHeight),
-  };
-}
-
-/**
  * Scatters leaves along the outer branches, then forces the result into the
  * species silhouette.
  *
  * Sampling along whole branches rather than only at their tips is what keeps a
  * canopy looking full: tip-only clustering leaves visible gaps once the branch
- * structure gets sparse, as it does on a conifer or a birch.
+ * structure gets sparse.
  */
 function scatterLeaves(
   branches: Branch[],
@@ -230,7 +144,7 @@ function scatterLeaves(
 
 /**
  * Pulls the canopy in toward its axis with height, so `taper` alone decides the
- * silhouette: 0 leaves a broad crown, 1 gives a conifer's cone. Doing this as a
+ * silhouette: 0 leaves a broad crown, 1 pinches toward a cone. Doing this as a
  * post-pass means the branch structure stays organic but the outline is exact.
  */
 function applyTaper(leaves: THREE.Vector3[], taper: number, height: number) {

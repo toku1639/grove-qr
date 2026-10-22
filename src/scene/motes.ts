@@ -4,7 +4,7 @@ import type { QrMatrix } from './qr';
 import type { Palette } from './palette';
 import { CLIMATES, type ClimateId } from './climate';
 
-const COUNT = 140;
+const COUNT = 60;
 
 export interface Motes {
   points: THREE.InstancedMesh;
@@ -59,13 +59,13 @@ export function buildMotes(qr: QrMatrix, palette: Palette): Motes {
       return;
     }
 
-    // calm / wind — leaf or petal flakes
+    // calm / wind — thin petal flakes (not chunky boxes)
     const gust = climate === 'wind' ? 1.55 : 1;
-    state[o + 3] = (0.7 + rng() * 1.4) * gust;
+    state[o + 3] = (0.55 + rng() * 1.1) * gust;
     state[o + 4] = (0.35 + rng() * 0.95) * gust;
-    state[o + 6] = 0.28 + rng() * 0.14;
-    state[o + 7] = 0.08 + rng() * 0.05;
-    state[o + 8] = 0.22 + rng() * 0.12;
+    state[o + 6] = 0.16 + rng() * 0.1;
+    state[o + 7] = 0.03 + rng() * 0.025;
+    state[o + 8] = 0.14 + rng() * 0.08;
   };
 
   for (let i = 0; i < COUNT; i++) spawn(i);
@@ -86,15 +86,26 @@ export function buildMotes(qr: QrMatrix, palette: Palette): Motes {
     if (points.instanceColor) points.instanceColor.needsUpdate = true;
   };
 
+  const refreshActive = () => {
+    // Summer calm shouldn't rain "petals" — greens stay on the tree.
+    if (paletteRef.id === 'summer' && (climate === 'calm' || climate === 'wind')) {
+      active = climate === 'wind' ? Math.floor(COUNT * 0.2) : 0;
+      return;
+    }
+    active = Math.min(COUNT, Math.floor(COUNT * CLIMATES[climate].density));
+  };
+
   const applyPalette = (p: Palette) => {
     paletteRef = p;
+    refreshActive();
+    for (let i = 0; i < COUNT; i++) spawn(i);
     paint();
   };
 
   const setClimate = (id: ClimateId) => {
     if (climate === id) return;
     climate = id;
-    active = Math.min(COUNT, Math.floor(COUNT * CLIMATES[id].density));
+    refreshActive();
     for (let i = 0; i < COUNT; i++) spawn(i);
     paint();
   };

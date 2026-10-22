@@ -1,7 +1,10 @@
 import QRCode from 'qrcode';
 
-/** Modules of light padding kept clear on every side so scanners lock on. */
-export const QUIET_ZONE = 4;
+/**
+ * Extra light modules around the payload. 0 = finders sit on the plot edge
+ * (matches the decorative tree-QR look; ECC H still carries the scan).
+ */
+export const QUIET_ZONE = 0;
 
 export interface QrMatrix {
   /** Width/height of the payload matrix, excluding the quiet zone. */
