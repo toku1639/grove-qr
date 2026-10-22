@@ -16,6 +16,13 @@ npm test
 npm run build
 ```
 
+## GitHub Pages
+
+公開 URL: https://toku1639.github.io/grove-qr/
+
+`main` への push で Actions が `dist` をビルドして Pages にデプロイします。  
+リポジトリ設定の **Pages → Source** は **GitHub Actions** にしてください（`/docs` やブランチ直出しだと真っ白になります）。
+
 ## 構成
 
 ```text
